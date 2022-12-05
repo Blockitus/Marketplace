@@ -65,10 +65,6 @@ contract BlockitusMarketplace {
         return _offers[collection][id];
     }
 
-    function getBalance() external view returns (uint256) {
-        return  address(this).balance;
-    }
-
     function compute_fee(uint256 price) private pure returns (uint256) {
         return price * fee / 100;
     }
