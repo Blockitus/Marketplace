@@ -8,12 +8,17 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract BlockitusMarketplace {
     uint8 constant public fee = 1;
-    uint256 public idProposal;
+    uint256 public counter;
     uint256 public accProfit;
 
     address public owner;
 
     IERC721 nft_collection;
+
+    struct Offer {
+        address collection;
+        uint256 nftId;
+    }
 
     struct Proposal {
         address collection;
@@ -23,17 +28,13 @@ contract BlockitusMarketplace {
         uint256 price;
     }
 
-    mapping (address => mapping (uint256 => uint256)) private _offers;
+    uint256[] private _totalOffers;
     
-    mapping (uint256 => Proposal) private _proposalInfo;
-    //all proposals that a buyer has sent
-    mapping (address => uint256[]) private _proposalsRequests;
-    mapping (uint256 => uint256) private _indexIdInBuyerLedger;
-    
-    //all Seller's proposals pending to accept
-    mapping (address => uint256[]) private _proposalsPendingToAccept;
-    mapping (uint256 => uint256) private _indexIdInSellerLedger;
-
+    mapping (uint256 => Offer) private _offers;
+    mapping (uint256 => uint256) private _prices;
+    mapping (uint256 => address) private _owners;
+    mapping (address => uint256) private _offersQty;
+    mapping (address => mapping(uint256 => uint256)) private _offerIndexById;
 
     event Sell(address indexed seller, uint256 id, uint256 price);
     event Buy(address indexed buyer, address indexed seller, uint256 id, uint256 price);
@@ -45,28 +46,45 @@ contract BlockitusMarketplace {
         owner = msg.sender;
     }
 
-    function sell(address collection, uint256 id, uint256 price) public {
+    function sell(address collection, uint256 nftId, uint256 price) public {
         //owner should have to approve the contract before call this function
         nft_collection = IERC721(collection);
-        require(nft_collection.ownerOf(id) == msg.sender || nft_collection.getApproved(id) == msg.sender, "Marketplace: You have not permits over this item");
+        require(nft_collection.ownerOf(nftId) == msg.sender, "Marketplace: You are not the NFT's owner");
         require(price > 0, "Marketplace: The price should be greater than 0.");
-        _offers[collection][id] = price;
+        uint256 id = counter += 1;
+        _totalOffers.push(id);
+        _offers[id] = Offer(collection, nftId);
+        _prices[id] = price;
+        _owners[id] = msg.sender;
+        _offersQty[msg.sender] += 1;
+        _offerIndexById[msg.sender][id] = _totalOffers.length - 1;
+        assert(nft_collection.safeTransferFrom(msg.seder, address(this), nftId));
         emit Sell(msg.sender, id,  price);
         
     }
 
+    function cancel_offer(uint256 id) public {
+        require(msg.sender == _owners[id], "Marketplace: You are not the offer's owner.");
+        nft_collection = IERC721(_offers[id].collection);
+        uint256 nftId = _offers[id].nftId; 
+        _delete_offer(id);
+        assert(nft_collection.safeTransferFrom(address(this), msg.sender, nftId));
+    }
 
-    function buy(address collection, uint256 id) public payable  {
-        nft_collection = IERC721(collection); 
-        address seller = nft_collection.ownerOf(id);
-        uint256 price = _offers[collection][id];
-        uint256 net = net_pay(collection, id);
+
+    function buy(uint256 id) public payable  {
+        nft_collection = IERC721(_offers[id].collection); 
+        uint256 nftId = _offers[id].nftId;
+        uint256 net = net_pay(id);
         uint256 remaining = msg.value - net;
+        uint256 price = _prices[id];
         uint256 profit = _compute_fee(price);
-        require(msg.value > 0 && msg.value >= net , "Marketplace: Error in amount");
-        require(msg.sender != seller, "Marketplace: You are the NFT's owner"); //msg.sender is the buyer
-        nft_collection.safeTransferFrom(seller, msg.sender, id);
-        delete _offers[collection][id];
+        uint256 seller = _owners[id];
+        uint256 index = _offerIndexById[seller][id];
+        require(index <= _offers.length - 1, "Marketplace: Offer does not exist.");
+        require(msg.value >= net , "Marketplace: Error in amount");
+        _delete_offer(id);
+        assert(nft_collection.safeTransferFrom(address(this), msg.sender, nftId));
         payable(seller).transfer(price);
         if (remaining > 0) {
             payable(msg.sender).transfer(remaining);
@@ -84,99 +102,39 @@ contract BlockitusMarketplace {
         payable(owner).transfer(amount);
     }
 
-    function change_price(address collection, uint256 id, uint256 price) public {
-        nft_collection = IERC721(collection);
-        address seller = nft_collection.ownerOf(id);
-        require(msg.sender == seller, "Marketplace: You are not the owner.");
-        uint256 old_price = _offers[collection][id];
+    function change_price(uint256 id, uint256 price) public {
+        nft_collection = IERC721(_offers[id].collection); 
+        require(msg.sender == _owners[id], "Marketplace: You are not the owner.");
+        uint256 old_price = _prices[id];
         require(old_price != price && price > 0);
-        _offers[collection][id] = price;
+        _prices[id] = price;
         emit ChangeOffer(id, price);
     }
 
-    function gift(address collection, address beneficiary, uint256 id) public {
-        nft_collection = IERC721(collection);
-        address seller = nft_collection.ownerOf(id);
-        require(msg.sender == seller, "Marketplace: You are not the owner.");
-        nft_collection.safeTransferFrom(msg.sender, beneficiary, id);
+    function gift(address beneficiary, uint256 id) public {
+        nft_collection = IERC721(_offers[id].collection); 
+        require(msg.sender == _owners[id], "Marketplace: You are not the owner.");
+        assert(nft_collection.safeTransferFrom(address(this), beneficiary, id));
         emit Gift(msg.sender, beneficiary, id);
     }
-
-    function send_proposal(address collection, uint256 id) public payable {
-        nft_collection = IERC721(collection);
-        address seller = nft_collection.ownerOf(id);
-        uint256 price = msg.value - _compute_fee(msg.value);
-        accProfit += _compute_fee(msg.value);
-        Proposal memory proposal = Proposal({
-            collection: collection,
-            buyer: msg.sender,
-            seller: seller,
-            idNFT: id,
-            price: price
-        });
-
-        idProposal += 1;
-        _proposalInfo[idProposal] = proposal;
-        
-        _proposalsRequests[msg.sender].push(idProposal);
-        _indexIdInBuyerLedger[idProposal] = _proposalsRequests[msg.sender].length - 1;
-
-        
-        _proposalsPendingToAccept[seller].push(idProposal);
-        _indexIdInSellerLedger[idProposal] = _proposalsPendingToAccept[seller].length - 1;
-        emit SendProposal(msg.sender, seller, price);
-    }
-
-
-    function accept_proposal(uint256 proposalId ) public {
-        address collection = _proposalInfo[proposalId].collection;
-        address buyer = _proposalInfo[proposalId].buyer;
-        address seller = _proposalInfo[proposalId].seller;
-        uint256 id = _proposalInfo[proposalId].idNFT;
-        uint256 price = _proposalInfo[proposalId].price;
-        uint256 indexB = _indexIdInBuyerLedger[proposalId];
-        uint256 indexS = _indexIdInSellerLedger[proposalId];
-        nft_collection = IERC721(collection);
-        require(msg.sender == nft_collection.ownerOf(id), "Marketplace: You are not the owner.");
-        nft_collection.safeTransferFrom(msg.sender, buyer, id);
-        delete _offers[collection][id];
-        delete _proposalInfo[proposalId];
-        delete _indexIdInBuyerLedger[proposalId];
-        delete _indexIdInSellerLedger[proposalId];
-        _swap(indexB, _proposalsRequests[buyer]);
-        _swap(indexS, _proposalsPendingToAccept[seller]);
-        emit Buy(buyer, seller, id, price);
-        payable(seller).transfer(price);
-
-    }   
-
-    function cancel_proposal(uint256 proposalId) public {
-        address collection = _proposalInfo[proposalId].collection;
-        address buyer = _proposalInfo[proposalId].buyer;
-        address seller = _proposalInfo[proposalId].seller;
-        uint256 id = _proposalInfo[proposalId].idNFT;
-        uint256 price = _proposalInfo[proposalId].price;
-        uint256 indexB = _indexIdInBuyerLedger[proposalId];
-        uint256 indexS = _indexIdInSellerLedger[proposalId];
-        nft_collection = IERC721(collection);
-        require(msg.sender == buyer, "Marketplace: You are not the proposal's owner.");
-        delete _proposalInfo[proposalId];
-        delete _indexIdInBuyerLedger[proposalId];
-        delete _indexIdInSellerLedger[proposalId];
-        _swap(indexB, _proposalsRequests[buyer]);
-        _swap(indexS, _proposalsPendingToAccept[seller]);
-        emit Buy(buyer, seller, id, price);
-        payable(buyer).transfer(price);
-        
-    }
     
-    function net_pay(address collection, uint256 id) public view returns (uint256) {
-        uint256 price = _offers[collection][id];
-        return price + _compute_fee(price);
+    function net_pay(uint256 id) public view returns (uint256) {
+        return _prices[id] + _compute_fee(_prices[id]);
     }
 
     function getPrice(address collection, uint256 id) external view returns (uint256) {
         return _offers[collection][id];
+    }
+
+    function _delete_offer(uint256 id) private {
+        uint256 seller = _owners[id];
+        uint256 index = _offerIndexById[seller][id];
+        _swap(index, _totalOffers);
+        delete _offers[id];
+        delete _prices[id];
+        delete _owners[id];
+        delete _offerIndexById[seller][id];
+        _offersQty[seller] -= 1;
     }
 
     function _swap(uint256 index, uint256[] storage array) private {
