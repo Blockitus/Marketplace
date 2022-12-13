@@ -58,7 +58,7 @@ contract BlockitusMarketplace {
         _owners[id] = msg.sender;
         _offersQty[msg.sender] += 1;
         _offerIndexById[msg.sender][id] = _totalOffers.length - 1;
-        assert(nft_collection.safeTransferFrom(msg.seder, address(this), nftId));
+        nft_collection.safeTransferFrom(msg.sender, address(this), nftId);
         emit Sell(msg.sender, id,  price);
         
     }
@@ -68,7 +68,7 @@ contract BlockitusMarketplace {
         nft_collection = IERC721(_offers[id].collection);
         uint256 nftId = _offers[id].nftId; 
         _delete_offer(id);
-        assert(nft_collection.safeTransferFrom(address(this), msg.sender, nftId));
+        nft_collection.safeTransferFrom(address(this), msg.sender, nftId);
     }
 
 
@@ -79,12 +79,12 @@ contract BlockitusMarketplace {
         uint256 remaining = msg.value - net;
         uint256 price = _prices[id];
         uint256 profit = _compute_fee(price);
-        uint256 seller = _owners[id];
+        address seller = _owners[id];
         uint256 index = _offerIndexById[seller][id];
-        require(index <= _offers.length - 1, "Marketplace: Offer does not exist.");
+        require(index <= _totalOffers.length - 1, "Marketplace: Offer does not exist.");
         require(msg.value >= net , "Marketplace: Error in amount");
         _delete_offer(id);
-        assert(nft_collection.safeTransferFrom(address(this), msg.sender, nftId));
+        nft_collection.safeTransferFrom(address(this), msg.sender, nftId);
         payable(seller).transfer(price);
         if (remaining > 0) {
             payable(msg.sender).transfer(remaining);
@@ -114,7 +114,7 @@ contract BlockitusMarketplace {
     function gift(address beneficiary, uint256 id) public {
         nft_collection = IERC721(_offers[id].collection); 
         require(msg.sender == _owners[id], "Marketplace: You are not the owner.");
-        assert(nft_collection.safeTransferFrom(address(this), beneficiary, id));
+        nft_collection.safeTransferFrom(address(this), beneficiary, id);
         emit Gift(msg.sender, beneficiary, id);
     }
     
@@ -122,12 +122,12 @@ contract BlockitusMarketplace {
         return _prices[id] + _compute_fee(_prices[id]);
     }
 
-    function getPrice(address collection, uint256 id) external view returns (uint256) {
-        return _offers[collection][id];
+    function getPrice(uint256 id) external view returns (uint256) {
+        return _prices[id];
     }
 
     function _delete_offer(uint256 id) private {
-        uint256 seller = _owners[id];
+        address seller = _owners[id];
         uint256 index = _offerIndexById[seller][id];
         _swap(index, _totalOffers);
         delete _offers[id];
