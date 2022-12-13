@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract BMarket1155 is ERC1155    {
     uint8 constant public fee = 1;
+    uint8 constant tokenAccount = 1;
     uint256 public accProfit;
     uint256 private _offerId;
     address public owner;
@@ -15,7 +16,6 @@ contract BMarket1155 is ERC1155    {
 
     //message = struct Order {address seller, address collection, uint256 nftIdd, uint256 price}  
     mapping (uint256 => bytes) private _offers;
-    mapping (address => uint256) private _accounts;
 
     event Sell(address indexed seller, uint256 id, uint256 price);
     event Buy(address indexed buyer, address indexed seller, uint256 id, uint256 price);
@@ -24,25 +24,15 @@ contract BMarket1155 is ERC1155    {
         owner = msg.sender;
     }     
 
-    function signIn() public {
-        require(balanceOf(msg.sender, _accounts[msg.sender]) == 0, "Marketplace you already have an account");
-        _accounts[msg.sender] = 1; 
-    }
-
-    function accountExist(address user) public view returns (bool) {
-        return _accounts[user] > 0 ;
-    } 
-
     function sell(address collection, uint256 nftId, uint256 price) public {
         nft_collection = IERC721(collection);
-        require(accountExist(msg.sender), "Marketplace: You do not have an account, go to sign in.");
-        require(nft_collection.ownerOf(nftId) == msg.sender, "Marketplace: You are not the NFT's owner");
+        require(nft_collection.getApproved(nftId) == address(this), "Marketplace: You are not the NFT's owner");
         require(price > 0, "Marketplace: The price should be greater than 0.");
         nft_collection.safeTransferFrom(msg.sender, address(this), nftId);
         bytes memory offer = abi.encode(msg.sender, collection, nftId, price);
         _offerId += 1;
         _offers[_offerId] = offer;
-        _mint(msg.sender, _accounts[msg.sender], _offerId, "");
+        _mint(msg.sender, tokenAccount , _offerId, "");
     }
 
     function cancelOffer(uint256 offerId) public {
@@ -50,10 +40,9 @@ contract BMarket1155 is ERC1155    {
         (address seller, address collection, uint256 nftId, ) = abi.decode(encodedData, (address, address, uint256, uint256));
         require(msg.sender == seller, "Marketplace you are not the offer's owner" );
         delete _offers[offerId];
-        _burn(msg.sender, _accounts[msg.sender], offerId);
+        _burn(msg.sender, tokenAccount, offerId);
         nft_collection = IERC721(collection);
         nft_collection.safeTransferFrom(address(this), msg.sender, nftId);
-        
     }
 
     function buy(uint256 offerId) public payable {
@@ -61,7 +50,7 @@ contract BMarket1155 is ERC1155    {
         (address seller, address collection, uint256 nftId, uint256 price) = abi.decode(encodedData, (address, address, uint256, uint256));
         require(msg.value >= price + _compute_fee(price), "Marketplace: You have not enough funds.");
         delete _offers[offerId];
-        _burn(seller, _accounts[seller], offerId);
+        _burn(seller, tokenAccount, offerId);
         uint256 remaining = msg.value - price + _compute_fee(price);
         accProfit += _compute_fee(price);
         payable(seller).transfer(price);

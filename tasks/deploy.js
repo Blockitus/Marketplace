@@ -5,7 +5,7 @@ task("deploy", "Deploy a Blockitus Marketplace", async () => {
     
     console.log("Account balance:", (await deployer.getBalance()).toString());
     
-    const BMarket = await ethers.getContractFactory("BlockitusMarketplace");
+    const BMarket = await ethers.getContractFactory("BMarket1155");
     const bmarket = await BMarket.deploy();
   
     console.log("BMarket's address is ", bmarket.address);  

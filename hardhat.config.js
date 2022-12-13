@@ -4,6 +4,10 @@ require("@nomicfoundation/hardhat-toolbox");
 require("./tasks/deploy");
 require("./tasks/sell");
 require("./tasks/buy");
+require("./tasks/signin");
+require("./tasks/approveForAll");
+require("./tasks/getBalanceOf");
+require("./tasks/getOffer");
 
 module.exports = {
   solidity: "0.8.17",
@@ -11,7 +15,7 @@ module.exports = {
     ganache: {
       id:7555,
       url: "http://127.0.0.1:7545",
-      accounts: ['f5fb6f09f62a6c6420ddb4551c0ce44b292b9774892a780fcee09a2d2877e3bc', 'a3c458a6ae85cb822504b0afce687a29e65ecb06898546678d3e35ec09c8d3e5']
+      accounts: ['7f03c48bfbfede45e7f3202329ae9d9628bf6ace7740a61aed8aa3b3b77a55c0', 'ea787c9a845aefae85fb50529f83829b04bfe3d52b4abf49532beebeead36810']
     }
   }
 };
