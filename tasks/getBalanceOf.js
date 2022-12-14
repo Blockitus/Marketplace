@@ -1,5 +1,5 @@
 //The address eneed to be changed
-const addressFactory = "0x8B7df01b3ba239CC6cE4DC9a661093Cd3b3917a8";
+const addressFactory = "0x98BB60bE0eFDbFAf505f012929d9c6a01C0A881A";
 
 task("getBalance", "return user's balance")
     .addParam("user", "user's address.")
@@ -7,5 +7,5 @@ task("getBalance", "return user's balance")
         const bmarket = await ethers.getContractAt("BMarket1155", addressFactory);
         //let token_address = await erc20Factory.decodeFunctionResult("createToken", tx.data);
         let res = await bmarket.balanceOf(taskArgs.user, 1);
-        console.log(" seller " + res);
+        console.log(" balance of " + taskArgs.user + " is " +res);
 })

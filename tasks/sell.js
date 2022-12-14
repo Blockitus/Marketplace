@@ -1,5 +1,5 @@
 //The address eneed to be changed
-const addressFactory = "0x8B7df01b3ba239CC6cE4DC9a661093Cd3b3917a8";
+const addressFactory = "0x75A5613D43084CF8A78034c78D736b4e9B75745C";
 
 task("sell", "sell a new NFT")
     .addParam("collection", "collection's address.")
@@ -11,5 +11,5 @@ task("sell", "sell a new NFT")
         let tx = await bmarket.connect(signers[0]).sell(taskArgs.collection, taskArgs.nftid, taskArgs.price.toString());
         //let token_address = await erc20Factory.decodeFunctionResult("createToken", tx.data);
         let res = await tx.wait();
-        console.log(" price " + res.transactionHash);
+        console.log(" transaction hash " + res.transactionHash);
 })

@@ -1,5 +1,5 @@
 //The address eneed to be changed
-const addressFactory = "0x8B7df01b3ba239CC6cE4DC9a661093Cd3b3917a8";
+const addressFactory = "0x98BB60bE0eFDbFAf505f012929d9c6a01C0A881A";
 
 task("getOffer", "get NFT's characteristics")
     .addParam("id", "id to sell.")

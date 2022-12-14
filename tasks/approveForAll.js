@@ -1,5 +1,5 @@
 //The address eneed to be changed
-const addressFactory = "0x8B7df01b3ba239CC6cE4DC9a661093Cd3b3917a8";
+const addressFactory = "0x75A5613D43084CF8A78034c78D736b4e9B75745C";
 
 task("approve", "approve for all NFT owned by an user")
     .setAction(async (taskArgs) => {

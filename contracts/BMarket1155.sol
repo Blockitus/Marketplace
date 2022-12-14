@@ -4,8 +4,9 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract BMarket1155 is ERC1155    {
+contract BMarket1155 is ERC1155, IERC721Receiver {
     uint8 constant public fee = 1;
     uint8 constant tokenAccount = 1;
     uint256 public accProfit;
@@ -24,9 +25,18 @@ contract BMarket1155 is ERC1155    {
         owner = msg.sender;
     }     
 
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
     function sell(address collection, uint256 nftId, uint256 price) public {
         nft_collection = IERC721(collection);
-        require(nft_collection.getApproved(nftId) == address(this), "Marketplace: You are not the NFT's owner");
+        require(nft_collection.getApproved(nftId) == address(this), "Marketplace: You have not authorization to manage this item.`");
         require(price > 0, "Marketplace: The price should be greater than 0.");
         nft_collection.safeTransferFrom(msg.sender, address(this), nftId);
         bytes memory offer = abi.encode(msg.sender, collection, nftId, price);
@@ -51,14 +61,15 @@ contract BMarket1155 is ERC1155    {
         require(msg.value >= price + _compute_fee(price), "Marketplace: You have not enough funds.");
         delete _offers[offerId];
         _burn(seller, tokenAccount, offerId);
+        nft_collection = IERC721(collection);
+        nft_collection.safeTransferFrom(address(this), msg.sender, nftId);
         uint256 remaining = msg.value - price + _compute_fee(price);
         accProfit += _compute_fee(price);
         payable(seller).transfer(price);
         if (remaining > 0) {
             payable(msg.sender).transfer(remaining);
         }
-        nft_collection = IERC721(collection);
-        nft_collection.safeTransferFrom(address(this), msg.sender, nftId);
+       
     }
 
     function change_price(uint256 offerId, uint256 price) public {
