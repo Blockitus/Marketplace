@@ -5,8 +5,8 @@ pragma solidity >=0.7.0 <0.9.0;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract BMarketExtended is ERC1155{
-    uint8 constant public fee = 1;
+contract BDEX is ERC1155{
+    uint8 constant public FEE = 1;
     uint8 constant FT = 1;
     uint256 public accProfit;
     uint256 private _offerId;
@@ -62,7 +62,7 @@ contract BMarketExtended is ERC1155{
         }
         emit Buy(msg.sender, ftLedger, amount, price);    
     }
-    
+
     function change_price(uint256 offerId, uint256 price) public {
         bytes memory encodedData = _offers[offerId];
         (address seller, address collection, uint256 nftId, ) = abi.decode(encodedData, (address, address, uint256, uint256));
@@ -87,7 +87,7 @@ contract BMarketExtended is ERC1155{
 
 
     function _compute_fee(uint256 price) private pure returns (uint256) {
-        return price * fee / 100;
+        return price * FEE / 100;
     }
 
 
